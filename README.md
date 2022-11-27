@@ -1,36 +1,22 @@
-Package Name Here
-===================================
+PHP ACL
+=======
 
-![CI](https://github.com/renoki-co/:package_name/workflows/CI/badge.svg?branch=master)
-[![codecov](https://codecov.io/gh/renoki-co/:package_name/branch/master/graph/badge.svg)](https://codecov.io/gh/renoki-co/:package_name/branch/master)
+![CI](https://github.com/renoki-co/acl/workflows/CI/badge.svg?branch=master)
+[![codecov](https://codecov.io/gh/renoki-co/acl/branch/master/graph/badge.svg)](https://codecov.io/gh/renoki-co/acl/branch/master)
 [![StyleCI](https://github.styleci.io/repos/:styleci_code/shield?branch=master)](https://github.styleci.io/repos/:styleci_code)
-[![Latest Stable Version](https://poser.pugx.org/renoki-co/:package_name/v/stable)](https://packagist.org/packages/renoki-co/:package_name)
-[![Total Downloads](https://poser.pugx.org/renoki-co/:package_name/downloads)](https://packagist.org/packages/renoki-co/:package_name)
-[![Monthly Downloads](https://poser.pugx.org/renoki-co/:package_name/d/monthly)](https://packagist.org/packages/renoki-co/:package_name)
-[![License](https://poser.pugx.org/renoki-co/:package_name/license)](https://packagist.org/packages/renoki-co/:package_name)
+[![Latest Stable Version](https://poser.pugx.org/renoki-co/acl/v/stable)](https://packagist.org/packages/renoki-co/acl)
+[![Total Downloads](https://poser.pugx.org/renoki-co/acl/downloads)](https://packagist.org/packages/renoki-co/acl)
+[![Monthly Downloads](https://poser.pugx.org/renoki-co/acl/d/monthly)](https://packagist.org/packages/renoki-co/acl)
+[![License](https://poser.pugx.org/renoki-co/acl/license)](https://packagist.org/packages/renoki-co/acl)
 
-**Note:** Replace  ```:package_name``` ```:package_description``` ```:package_namespace``` ```:package_service_provider``` ```:styleci_code``` with their correct values in [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), [LICENSE](LICENSE) and [composer.json](composer.json) files, then delete this line.
-
-This is where your description should go. Try and limit it to a paragraph or two. Consider adding a small example.
+Simple ACL for PHP applications, AWS IAM style. 🔐
 
 ## 🚀 Installation
 
 You can install the package via composer:
 
 ```bash
-composer require renoki-co/:package_name
-```
-
-Publish the config:
-
-```bash
-$ php artisan vendor:publish --provider="RenokiCo\:package_namespace\:package_service_provider" --tag="config"
-```
-
-Publish the migrations:
-
-```bash
-$ php artisan vendor:publish --provider="RenokiCo\:package_namespace\:package_service_provider" --tag="migrations"
+composer require renoki-co/acl
 ```
 
 ## 🙌 Usage

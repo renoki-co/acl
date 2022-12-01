@@ -174,7 +174,7 @@ class Policy
     {
         if (is_string($resourceArn) && class_exists($resourceArn)) {
             $resourceArn = $resourceArn::resourceIdAgnosticArn($this->actor);
-        } else if ($resourceArn instanceof Arnable) {
+        } elseif ($resourceArn instanceof Arnable) {
             $resourceArn = $resourceArn->toArn();
         }
 

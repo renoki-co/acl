@@ -5,6 +5,7 @@ namespace RenokiCo\Acl;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use RenokiCo\Acl\Contracts\Arnable;
+use RenokiCo\Acl\Contracts\RuledByPolicies;
 
 class Policy
 {
@@ -12,12 +13,12 @@ class Policy
      * Initialize the policy.
      *
      * @param  array  $statement
-     * @param  null|\RenokiCo\Acl\Concerns\HasPolicies  $actor
+     * @param  null|\RenokiCo\Acl\Contracts\RuledByPolicies  $actor
      * @return void
      */
     public function __construct(
         protected array $statement = [],
-        protected mixed $actor = null,
+        protected ?RuledByPolicies $actor = null,
     ) {
         //
     }
@@ -27,10 +28,10 @@ class Policy
      * actor will be passed deeper to static, Arnable
      * instances that expose the "resourceIdAgnosticArn" function.
      *
-     * @param  \RenokiCo\Acl\Concerns\HasPolicies  $actor
+     * @param  \RenokiCo\Acl\Contracts\RuledByPolicies  $actor
      * @return $this
      */
-    public function actingAs($actor)
+    public function actingAs(RuledByPolicies $actor)
     {
         $this->actor = $actor;
 

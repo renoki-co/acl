@@ -24,7 +24,6 @@ jobs:
         laravel:
           - 9.*
         prefer:
-          - 'prefer-lowest'
           - 'prefer-stable'
         include:
           - laravel: '9.*'

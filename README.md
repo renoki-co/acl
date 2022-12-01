@@ -1,15 +1,14 @@
-PHP ACL
-=======
+# PHP ACL
 
 ![CI](https://github.com/renoki-co/acl/workflows/CI/badge.svg?branch=master)
 [![codecov](https://codecov.io/gh/renoki-co/acl/branch/master/graph/badge.svg)](https://codecov.io/gh/renoki-co/acl/branch/master)
-[![StyleCI](https://github.styleci.io/repos/:styleci_code/shield?branch=master)](https://github.styleci.io/repos/:styleci_code)
+[![StyleCI](https://github.styleci.io/repos/571248844/shield?branch=master)](https://github.styleci.io/repos/571248844)
 [![Latest Stable Version](https://poser.pugx.org/renoki-co/acl/v/stable)](https://packagist.org/packages/renoki-co/acl)
 [![Total Downloads](https://poser.pugx.org/renoki-co/acl/downloads)](https://packagist.org/packages/renoki-co/acl)
 [![Monthly Downloads](https://poser.pugx.org/renoki-co/acl/d/monthly)](https://packagist.org/packages/renoki-co/acl)
 [![License](https://poser.pugx.org/renoki-co/acl/license)](https://packagist.org/packages/renoki-co/acl)
 
-Simple ACL for PHP applications, AWS IAM style. 🔐
+Simple, JSON-based, AWS IAM-style ACL for PHP applications, leveraging granular permissions in your applications with strong declarations. 🔐
 
 ## 🚀 Installation
 
@@ -21,8 +20,333 @@ composer require renoki-co/acl
 
 ## 🙌 Usage
 
+In case you are familiar with how [ARNs](https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html) and [Policies](https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction_access-management.html) work, you can now use the same syntax to define and check your ACL policies.
+
+You can check more [IAM examples](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_examples.html) to get a sense how to define your policies.
+
+The role of an ACL system is to assign policies or rules/statements to specific entities that can perform certain actions on a set of resources, so later you can verify them throughout the app.
+
+To define an actor class, you have to trait it up with `HasPolicies`:
+
 ```php
-$ //
+use RenokiCo\Acl\Concerns\HasPolicies;
+use RenokiCo\Acl\Contracts\RuledByPolicies;
+
+class Account implements RuledByPolicies
+{
+    use HasPolicies;
+
+    public $id;
+
+    /**
+     * Resolve the account ID of the current actor.
+     * This value will be used in ARNs for ARNable static instances,
+     * to see if the current actor can perform ID-agnostic resource actions.
+     *
+     * @return null|string|int
+     */
+    public function resolveArnAccountId()
+    {
+        return $this->id;
+    }
+}
+```
+
+Whenever you require the actor to check for permissions, you will have to load them up in its class. If you are using ORM/DTO, you can easily store them in the database alongside the actor itself, and you can pull the policies with it.
+
+```php
+$policy = Acl::createPolicy([
+    [
+        'Effect' => 'Allow',
+        'Action' => 'server:List',
+        'Resource' => [
+            'arn:php:server-manager:local:123:server',
+        ],
+    ],
+]);
+
+$account = Account::readFromDatabase('123');
+
+$account->loadPolicies([$policy]);
+
+$account->isAllowedTo('server:List', 'arn:php:server-manager:local:123:server'); // true
+```
+
+## 🧬 ARNables
+
+PHP is more object-oriented. ARNables can help turn your classes, like DTOs or Models, into a simpler version of ARNs, so you don't have to write all your ARNs each time, but instead pass them to the `isAllowedTo()` method, depending on either it's an ARN that is resource-agnostic, or an ARN that points to a specific resource.
+
+### Resource-agnostic ARN vs Resource ARN
+
+Resource-agnostic ARNs are the ones that are used for actions like `list` or `create`. They are not pointing to a specific resource, but rather to a "general" permission for that resource, that can lead to allowing listing or creating resources. For example, `arn:php:server-manager:local:123:server`.
+
+Resource ARNs are the ARNs that point to a specific resource. Actions like `delete`, `modify` and such are good examples that can be used in combination with these ARNs. For example, `arn:php:server-manager:local:123:server/1` or `arn:php:server-manager:local:123:backup/1`.
+
+### Resolving the Region and Account IDs
+
+Let's take this ARN example: `arn:php:server-manager:local:123:server`.
+
+Since this ARN is agnostic, the `Server` class cannot be properly converted to an ARN without two key components:
+
+- the region, in this case `local`
+- the account ID, in this case `123`
+
+Although the values do have defaults, you **must** let the ACL service know what the values should be.
+
+For these values, you can take AWS' example: it lets you select the region (in console: by manually changing the region via the top-right selector; in the API: by specifying the `--region` parameter), and you must be authenticated to an account, in this case your current login session knows your Account ID.
+
+In ACL, before running any logic, you need to set up your login into a callable function that will return the proper value for either region or the account ID, in case of Resource-agnostic ARNs.
+
+```php
+use RenokiCo\Acl\Acl;
+
+Acl::provideAccountIdInArns(function () {
+    // i.e. Access the current user and retrieve its ID.
+    return currentUser()->id;
+});
+
+Acl::provideRegionInArns(function () {
+    // i.e. Retrieve the region if ?region=... exists.
+    return $_GET['region'] ?? 'local';
+});
+```
+
+### Using ARNables with actors
+
+Let's say you have a class that is an ORM/DTO class of a database-stored `Server` instance that belongs to an account/user:
+
+```php
+use RenokiCo\Acl\Concerns\HasArn;
+use RenokiCo\Acl\Contracts\Arnable;
+use RenokiCo\Acl\BuildResourceArn;
+
+class Server implements Arnable
+{
+    use HasArn;
+
+    public string $id;
+    public string $accountId;
+    public string $name;
+    public string $ip;
+
+    public function arnResourceAccountId()
+    {
+        return $this->accountId;
+    }
+
+    public function arnResourceId()
+    {
+        return $this->id;
+    }
+}
+```
+
+Instead of passing full ARNs to `->isAllowedTo`, you can now pass the server class name instead:
+
+```php
+$policy = Acl::createPolicy([
+    [
+        'Effect' => 'Allow',
+        'Action' => 'server:List',
+        'Resource' => [
+            'arn:php:server-manager:local:123:server',
+        ],
+    ],
+    [
+        'Effect' => 'Allow',
+        'Action' => 'server:Delete',
+        'Resource' => [
+            'arn:php:server-manager:local:123:server/1',
+        ],
+    ],
+]);
+
+$account = Account::readFromDatabase('123');
+$account->loadPolicies([$policy]);
+
+$account->isAllowedTo('server:List', Server::class); // true
+```
+
+To check permissions on a specific resource ARN, you may pass the object itself to the ARN parameter:
+
+```php
+$server = Server::readFromDatabase('1');
+
+$account->isAllowedTo('server:Delete', $server); // true
+```
+
+As you have seen previously, on the actor instances you can specify the account identifier for them. In an ARN like `arn:php:server-manager:local:123:server`, the part `123` is the account ID, or the account identifier. Thus, setting `resolveArnAccountId` to return `123`, the policies will allow the actor to `server:List` on that specific resource.
+
+### Using ARNables with groups that contain actors
+
+On a more complex note, having a model that groups more actors, like a `Team` having more `Account`s, you'd still need to implement the policy checking at the user level, but with regard to resolving the "account ID" to be more like Team ID, as long as the resources are created under `Team`.
+
+```php
+class Team
+{
+    //
+}
+```
+
+```php
+use RenokiCo\Acl\Concerns\HasPolicies;
+use RenokiCo\Acl\Contracts\RuledByPolicies;
+
+class Account implements RuledByPolicies
+{
+    use HasPolicies;
+
+    public $id;
+    public $teamId;
+
+    public function resolveArnAccountId()
+    {
+        return $this->teamId;
+    }
+}
+```
+
+Later on, checking permissions would work exactly the same way as before, but the checks will be done coming as from the "team", so each individual actor (in this case, `Account`) can have their permissions defined by the owner of that team.
+
+### Naming conventions, defaults and ARN parts
+
+Each `Arnable` instance is set, by default, to have their resoure name (which should be unique per service) based on the class base name.
+
+For example, a `Server` class is part of the `baremetal` service that serves customers with bare metals, IPs, Disks and more that can be used on Bare Metals. Its name as resource under that `baremetal` service is going to be `server`, and it would have an ARN like the following:
+
+```text
+arn:php:baremetal:local:team-1:server
+```
+
+Here are some examples how resource names are generated based on their class name:
+
+- `DockerImage` -> `dockerimage`
+- `Backup` -> `backup`
+- `2FA` -> `2fa`
+
+You can overwrite the resource name by overriding the `arnResourceType` method:
+
+```php
+use RenokiCo\Acl\Concerns\HasArn;
+use RenokiCo\Acl\Contracts\Arnable;
+use RenokiCo\Acl\BuildResourceArn;
+
+class DemoServer implements Arnable
+{
+    use HasArn;
+
+    public static function arnResourceType()
+    {
+        return 'server';
+    }
+}
+```
+
+Alternatively, you can also modify other parts of the resource ARN for an `Arnable`:
+
+```php
+class Server implements Arnable
+{
+    use HasArn;
+
+    public function arnResourcePartition()
+    {
+        return 'php';
+    }
+
+    public function arnResourceService()
+    {
+        return 'baremetal';
+    }
+
+    public function arnResourceRegion()
+    {
+        return $this->region;
+    }
+}
+```
+
+## 🏘 Cross-account permissions
+
+Some AWS services do support cross-account permissions. For example, you can allow any other actor (`Account`) to interact with your services without explicitly allowing to access your account or to join your team. Policies should be configured to specify any actor identifier to the ARN.
+
+## 📏 Guidelines
+
+Most guidelines are IAM-style, but we'll iterate through some of them. You can also read the guidelines in the [AWS ARN documentation](https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html) and [AWS IAM Documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/intro-structure.html).
+
+### Prefix actions with unique names
+
+Make sure your `Action` reflects a unique prefix per resource. For example, take this example on separating the same `List` command, but for different services:
+
+```php
+$policy = Acl::createPolicy([
+    [
+        'Effect' => 'Allow',
+        'Action' => [
+            'server:List',
+            'container:List',
+        ],
+        'Resource' => [
+            'arn:php:server-manager:local:123:server',
+            'arn:php:docker-manager:local:123:container',
+        ],
+    ],
+]);
+
+$policy->allows('server:List', 'arn:php:server-manager:local:123:server'); // true
+$policy->allows('container:List', 'arn:php:docker-manager:local:123:container'); // true
+```
+
+### Avoid checking for `<arn>/*` with Resource-agnostic actions
+
+Some misunderstanding around the wildcard resources can go like this:
+
+```php
+$policy = Acl::createPolicy([
+    [
+        'Effect' => 'Allow',
+        'Action' => 'server:List',
+        'Resource' => 'arn:php:server-manager:local:123:server/123',
+    ],
+]);
+
+$policy->allows('server:List', 'arn:php:server-manager:local:123:server/*');
+```
+
+In this case, the check will return `false`, but note that you're checking for all the servers by passing a wildcard `*`. The problem here is that you shoud never do that, as it's not relevant to check if the user "can list all the particular servers".
+
+Instead, use a better approach and define a statement without a specific resource for list commands, and define a statement with a specific resource for resource-individual actions, like `delete` or `shutdown`:
+
+```php
+$policy = Acl::createPolicy([
+    [
+        'Effect' => 'Allow',
+        'Action' => [
+            'server:List',
+            'server:Create',
+        ],
+        'Resource' => 'arn:php:server-manager:local:123:server',
+    ],
+    [
+        'Effect' => 'Allow',
+        'Action' => [
+            'server:Describe',
+            'server:Update',
+            'server:Delete',
+        ],
+        'Resource' => 'arn:php:server-manager:local:123:server/*',
+    ],
+]);
+
+// All five below will return true
+
+$policy->allows('server:List', 'arn:php:server-manager:local:123:server');
+$policy->allows('server:Create', 'arn:php:server-manager:local:123:server');
+
+$policy->allows('server:Describe', 'arn:php:server-manager:local:123:server/123');
+$policy->allows('server:Update', 'arn:php:server-manager:local:123:server/123');
+$policy->allows('server:Delete', 'arn:php:server-manager:local:123:server/123');
+
 ```
 
 ## 🐛 Testing

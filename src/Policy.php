@@ -12,12 +12,29 @@ class Policy
      * Initialize the policy.
      *
      * @param  array  $statement
+     * @param  null|\RenokiCo\Acl\Concerns\HasPolicies  $actor
      * @return void
      */
     public function __construct(
         protected array $statement = [],
+        protected mixed $actor = null,
     ) {
         //
+    }
+
+    /**
+     * Set the actor to test against this policy. This
+     * actor will be passed deeper to static, Arnable
+     * instances that expose the "resourceIdAgnosticArn" function.
+     *
+     * @param  \RenokiCo\Acl\Concerns\HasPolicies  $actor
+     * @return $this
+     */
+    public function actingAs($actor)
+    {
+        $this->actor = $actor;
+
+        return $this;
     }
 
     /**
@@ -155,8 +172,10 @@ class Policy
      */
     public function arnMatches(string|Arnable $resourceArn, string $statementArn): bool
     {
-        if ($resourceArn instanceof Arnable) {
-            $resourceArn = $resourceArn->toPolicyArn()?->getArn();
+        if (is_string($resourceArn) && class_exists($resourceArn)) {
+            $resourceArn = $resourceArn::resourceIdAgnosticArn($this->actor);
+        } else if ($resourceArn instanceof Arnable) {
+            $resourceArn = $resourceArn->toArn();
         }
 
         // Matching exact ARNs can save time.

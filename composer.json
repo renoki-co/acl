@@ -1,7 +1,7 @@
 {
     "name": "renoki-co/acl",
-    "description": "Simple ACL for PHP applications, AWS IAM style.",
-    "keywords": ["laravel", "php"],
+    "description": "Simple, JSON-based, AWS IAM-style ACL for PHP applications, leveraging granular permissions in your applications with strong declarations.",
+    "keywords": ["php", "aws", "iam", "acl", "permissions", "access", "control", "arn"],
     "license": "Apache-2.0",
     "homepage": "https://github.com/renoki-co/acl",
     "authors": [

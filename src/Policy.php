@@ -107,7 +107,7 @@ class Policy
                 && Arr::wrap($statement['Action']) === ['*']
             ) {
                 return true;
-            } else if (Arr::wrap($statement['Resource']) === ['*']) {
+            } elseif (Arr::wrap($statement['Resource']) === ['*']) {
                 // If all resources are allowed, check only for the actions.
                 foreach (Arr::wrap($statement['Action']) as $statementAction) {
                     if ($this->actionMatches($action, $statementAction)) {
@@ -116,7 +116,7 @@ class Policy
                 }
 
                 return false;
-            } else if (Arr::wrap($statement['Action']) === ['*']) {
+            } elseif (Arr::wrap($statement['Action']) === ['*']) {
                 // If all actions are allowed, check only for the matching ARN.
                 foreach (Arr::wrap($statement['Resource']) as $statementArn) {
                     if ($this->arnMatches($arn, $statementArn)) {
@@ -228,7 +228,7 @@ class Policy
         if ($resourceArn === '*') {
             if ($actor = $this->actor) {
                 $resourceArn = "arn:*:*:*:{$actor->resolveArnAccountId()}:*";
-            } else if ($rootAccountId = $this->rootAccountId) {
+            } elseif ($rootAccountId = $this->rootAccountId) {
                 $resourceArn = "arn:*:*:*:{$rootAccountId}:*";
             }
         }
@@ -238,7 +238,7 @@ class Policy
         if ($statementArn === '*') {
             if ($actor = $this->actor) {
                 $statementArn = "arn:*:*:*:{$actor->resolveArnAccountId()}:*";
-            } else if ($rootAccountId = $this->rootAccountId) {
+            } elseif ($rootAccountId = $this->rootAccountId) {
                 $statementArn = "arn:*:*:*:{$rootAccountId}:*";
             }
         }

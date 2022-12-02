@@ -18,17 +18,12 @@ class Policy
      * @return void
      */
     public function __construct(
-        protected array $statement = [],
+        public array $statement = [],
         protected ?RuledByPolicies $actor = null,
         protected null|string|int $rootAccountId = null,
     ) {
-        if ($actor) {
-            $this->actingAs($actor);
-        }
-
-        if ($rootAccountId) {
-            $this->setRootAccount($rootAccountId);
-        }
+        $this->actingAs($actor);
+        $this->setRootAccount($rootAccountId);
     }
 
     /**
@@ -36,11 +31,15 @@ class Policy
      * actor will be passed deeper to static, Arnable
      * instances that expose the "resourceIdAgnosticArn" function.
      *
-     * @param  \RenokiCo\Acl\Contracts\RuledByPolicies  $actor
+     * @param  null|\RenokiCo\Acl\Contracts\RuledByPolicies  $actor
      * @return $this
      */
-    public function actingAs(RuledByPolicies $actor)
+    public function actingAs(?RuledByPolicies $actor = null)
     {
+        if (is_null($actor)) {
+            return $this;
+        }
+
         $this->actor = $actor;
 
         foreach ($this->statement as &$statement) {
@@ -61,11 +60,15 @@ class Policy
      * it allows resources from other accounts too. This root account
      * prevents ->allow('<action>', '*') to allow even outside resources.
      *
-     * @param  string|int  $rootAccountId
+     * @param  string|int|null  $rootAccountId
      * @return $this
      */
-    public function setRootAccount(string|int $rootAccountId)
+    public function setRootAccount($rootAccountId = null)
     {
+        if (is_null($rootAccountId) || $this->actor) {
+            return $this;
+        }
+
         $this->rootAccountId = $rootAccountId;
 
         foreach ($this->statement as &$statement) {

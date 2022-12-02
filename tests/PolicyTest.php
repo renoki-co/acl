@@ -199,6 +199,70 @@ class PolicyTest extends TestCase
         $this->assertFalse($user->isAllowedTo('vps:List', new VpsWithTeam('vps-xxx')));
         $this->assertFalse($user->isAllowedTo('vps:Describe', VpsWithTeam::class));
     }
+
+    public function test_allow_actor_policy_on_every_resource()
+    {
+        $policy = Acl::createPolicy([
+            [
+                'Effect' => 'Allow',
+                'Action' => [
+                    'vps:List',
+                    'vps:Describe',
+                ],
+                'Resource' => '*',
+            ],
+        ]);
+
+        $user = new User('user-1');
+        $user->loadPolicies([$policy]);
+
+        request()->merge([
+            'user' => ['id' => 'user-1'],
+            'team' => ['id' => 'team-1'],
+        ]);
+
+        $this->assertTrue($user->isAllowedTo('vps:Describe', new VpsWithTeam('vps-000')));
+        $this->assertTrue($user->isAllowedTo('vps:Describe', new VpsWithTeam('vps-111')));
+        $this->assertTrue($user->isAllowedTo('vps:Describe', new VpsWithTeam('vps-000')));
+
+        $this->assertTrue($user->isAllowedTo('vps:List', VpsWithTeam::class));
+        $this->assertTrue($user->isAllowedTo('vps:List', VpsWithTeam::class));
+    }
+
+    public function test_allow_actor_policy_on_every_resource_ignoring_root_account_id()
+    {
+        $policy = Acl::createPolicy([
+            [
+                'Effect' => 'Allow',
+                'Action' => [
+                    'vps:List',
+                    'vps:Describe',
+                ],
+                'Resource' => '*',
+            ],
+        ]);
+
+        request()->merge([
+            'user' => ['id' => 'user-1'],
+            'team' => ['id' => 'team-1'],
+        ]);
+
+        $user = new User('user-1');
+        $user->loadPolicies([$policy]);
+
+        ray($user->arnPolicies[0]->statement);
+        ray((new VpsWithTeam('vps-000'))->toArn());
+
+        $this->assertTrue($user->isAllowedTo('vps:Describe', new VpsWithTeam('vps-000')));
+        $this->assertTrue($user->isAllowedTo('vps:Describe', new VpsWithTeam('vps-111')));
+        $this->assertTrue($user->isAllowedTo('vps:Describe', new VpsWithTeam('vps-000')));
+
+        $this->assertFalse($user->isAllowedTo('vps:Describe', new VpsWithTeam('vps-000', 'team-2')));
+        $this->assertFalse($user->isAllowedTo('vps:Describe', new VpsWithTeam('vps-111', 'team-2')));
+        $this->assertFalse($user->isAllowedTo('vps:Describe', new VpsWithTeam('vps-000', 'team-2')));
+
+        $this->assertTrue($user->isAllowedTo('vps:List', VpsWithTeam::class));
+    }
 }
 
 class User implements RuledByPolicies

@@ -11,7 +11,7 @@ trait HasPolicies
      *
      * @var array<int, \RenokiCo\Acl\Policy>
      */
-    protected $arnPolicies = [];
+    public $arnPolicies = [];
 
     /**
      * Load policies for this entity.

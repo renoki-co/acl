@@ -23,16 +23,12 @@ class Acl
      * Create a policy from statements.
      *
      * @param  array  $statement
-     * @param  null|\RenokiCo\Acl\Contracts\RuledByPolicies  $actor
-     * @param  null|string|int  $rootAccountId
      * @return Policy
      */
     public static function createPolicy(
         array $statement = [],
-        ?RuledByPolicies $actor = null,
-        null|string|int $rootAccountId = null,
     ) {
-        return new Policy($statement, $actor, $rootAccountId);
+        return new Policy($statement);
     }
 
     /**

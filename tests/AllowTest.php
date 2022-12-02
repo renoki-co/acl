@@ -52,7 +52,9 @@ class AllowTest extends TestCase
                 'Action' => '*',
                 'Resource' => '*',
             ],
-        ], rootAccountId: '000');
+        ]);
+
+        $policy->setRootAccount('000');
 
         $accounts = ['000', '111'];
 
@@ -82,6 +84,50 @@ class AllowTest extends TestCase
             $this->assertEquals($accountMatchesRoot, $policy->allows('vps:Shutdown', "arn:php:service1:local:{$account}:vps/vps-222"));
             $this->assertEquals($accountMatchesRoot, $policy->allows('vps:Shutdown', "arn:php:service1:local:{$account}:vps/vps-333"));
         }
+    }
+
+    public function test_allow_policy_on_every_resource_without_root_id()
+    {
+        $policy = Acl::createPolicy([
+            [
+                'Effect' => 'Allow',
+                'Action' => [
+                    'vps:List',
+                    'vps:Describe',
+                ],
+                'Resource' => '*',
+            ],
+        ]);
+
+        $this->assertTrue($policy->allows('vps:Describe', 'arn:php:service1:local:000:vps/vps-000'));
+        $this->assertTrue($policy->allows('vps:Describe', 'arn:php:service1:local:000:vps/vps-111'));
+        $this->assertTrue($policy->allows('vps:Describe', 'arn:php:service1:local:111:vps/vps-000'));
+
+        $this->assertTrue($policy->allows('vps:List', 'arn:php:service1:local:000:vps'));
+        $this->assertTrue($policy->allows('vps:List', 'arn:php:service1:local:111:vps'));
+    }
+
+    public function test_allow_policy_on_every_resource_restricted_by_root_id()
+    {
+        $policy = Acl::createPolicy([
+            [
+                'Effect' => 'Allow',
+                'Action' => [
+                    'vps:List',
+                    'vps:Describe',
+                ],
+                'Resource' => '*',
+            ],
+        ]);
+
+        $policy->setRootAccount('000');
+
+        $this->assertTrue($policy->allows('vps:Describe', 'arn:php:service1:local:000:vps/vps-000'));
+        $this->assertTrue($policy->allows('vps:Describe', 'arn:php:service1:local:000:vps/vps-111'));
+        $this->assertFalse($policy->allows('vps:Describe', 'arn:php:service1:local:111:vps/vps-000'));
+
+        $this->assertTrue($policy->allows('vps:List', 'arn:php:service1:local:000:vps'));
+        $this->assertFalse($policy->allows('vps:List', 'arn:php:service1:local:111:vps'));
     }
 
     public function test_allow_policy_on_all_actions_on_specific_resource()

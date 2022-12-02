@@ -10,6 +10,49 @@ use RenokiCo\Acl\Contracts\RuledByPolicies;
 
 class PolicyTest extends TestCase
 {
+    public function test_allow_policy_on_everything_restricted_by_actor()
+    {
+        $policy = Acl::createPolicy([
+            [
+                'Effect' => 'Allow',
+                'Action' => '*',
+                'Resource' => '*',
+            ],
+        ]);
+
+        $user = new User('user-1', 'team-1');
+        $user->loadPolicies([$policy]);
+
+        $accounts = ['team-1', 'team-2'];
+
+        $this->assertTrue($user->isAllowedTo('*', '*'));
+
+        foreach ($accounts as $account) {
+            $accountIdMatchesActor = $account === 'team-1';
+
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:*', "arn:php:service1:local:{$account}:vps/*"));
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:*', "arn:php:service1:local:{$account}:vps/vps-000"));
+
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Read', "arn:php:service1:local:{$account}:vps/*"));
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Read', "arn:php:service1:local:{$account}:vps/vps-000"));
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Read', "arn:php:service1:local:{$account}:vps/vps-111"));
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Read', "arn:php:service1:local:{$account}:vps/vps-222"));
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Read', "arn:php:service1:local:{$account}:vps/vps-333"));
+
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Delete', "arn:php:service1:local:{$account}:vps/*"));
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Delete', "arn:php:service1:local:{$account}:vps/vps-000"));
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Delete', "arn:php:service1:local:{$account}:vps/vps-111"));
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Delete', "arn:php:service1:local:{$account}:vps/vps-222"));
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Delete', "arn:php:service1:local:{$account}:vps/vps-333"));
+
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Shutdown', "arn:php:service1:local:{$account}:vps/*"));
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Shutdown', "arn:php:service1:local:{$account}:vps/vps-000"));
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Shutdown', "arn:php:service1:local:{$account}:vps/vps-111"));
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Shutdown', "arn:php:service1:local:{$account}:vps/vps-222"));
+            $this->assertEquals($accountIdMatchesActor, $user->isAllowedTo('vps:Shutdown', "arn:php:service1:local:{$account}:vps/vps-333"));
+        }
+    }
+
     public function test_policy_allow_on_a_general_arn_instance()
     {
         $policy = Acl::createPolicy([

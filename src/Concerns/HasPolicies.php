@@ -23,6 +23,10 @@ trait HasPolicies
     {
         $this->arnPolicies = $policies;
 
+        foreach ($this->arnPolicies as &$policy) {
+            $policy->actingAs($this);
+        }
+
         return $this;
     }
 
@@ -40,8 +44,6 @@ trait HasPolicies
         $allowsWithoutAnyExplicitDeny = false;
 
         foreach ($this->arnPolicies as $policy) {
-            $policy->actingAs($this);
-
             if ($policy->explicitlyDenies($action, $arn)) {
                 return false;
             }

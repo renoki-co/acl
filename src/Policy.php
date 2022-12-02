@@ -14,13 +14,21 @@ class Policy
      *
      * @param  array  $statement
      * @param  null|\RenokiCo\Acl\Contracts\RuledByPolicies  $actor
+     * @param  null|string|int  $rootAccountId
      * @return void
      */
     public function __construct(
         protected array $statement = [],
         protected ?RuledByPolicies $actor = null,
+        protected null|string|int $rootAccountId = null,
     ) {
-        //
+        if ($actor) {
+            $this->actingAs($actor);
+        }
+
+        if ($rootAccountId) {
+            $this->setRootAccount($rootAccountId);
+        }
     }
 
     /**
@@ -34,6 +42,41 @@ class Policy
     public function actingAs(RuledByPolicies $actor)
     {
         $this->actor = $actor;
+
+        foreach ($this->statement as &$statement) {
+            $statement['Resource'] = collect(Arr::wrap($statement['Resource']))->map(function ($resource) {
+                if ($resource !== '*') {
+                    return $resource;
+                }
+
+                return "arn:*:*:*:{$this->actor->resolveArnAccountId()}:*";
+            })->toArray();
+        }
+
+        return $this;
+    }
+
+    /**
+     * Set the root account ID. When specifying wildcard resources,
+     * it allows resources from other accounts too. This root account
+     * prevents ->allow('<action>', '*') to allow even outside resources.
+     *
+     * @param  string|int  $rootAccountId
+     * @return $this
+     */
+    public function setRootAccount(string|int $rootAccountId)
+    {
+        $this->rootAccountId = $rootAccountId;
+
+        foreach ($this->statement as &$statement) {
+            $statement['Resource'] = collect(Arr::wrap($statement['Resource']))->map(function ($resource) {
+                if ($resource !== '*') {
+                    return $resource;
+                }
+
+                return "arn:*:*:*:{$this->rootAccountId}:*";
+            })->toArray();
+        }
 
         return $this;
     }
@@ -64,10 +107,8 @@ class Policy
                 && Arr::wrap($statement['Action']) === ['*']
             ) {
                 return true;
-            }
-
-            // If all resources are allowed, check only for the actions.
-            if (Arr::wrap($statement['Resource']) === ['*']) {
+            } else if (Arr::wrap($statement['Resource']) === ['*']) {
+                // If all resources are allowed, check only for the actions.
                 foreach (Arr::wrap($statement['Action']) as $statementAction) {
                     if ($this->actionMatches($action, $statementAction)) {
                         return true;
@@ -75,10 +116,8 @@ class Policy
                 }
 
                 return false;
-            }
-
-            // If all actions are allowed, check only for the matching ARN.
-            if (Arr::wrap($statement['Action']) === ['*']) {
+            } else if (Arr::wrap($statement['Action']) === ['*']) {
+                // If all actions are allowed, check only for the matching ARN.
                 foreach (Arr::wrap($statement['Resource']) as $statementArn) {
                     if ($this->arnMatches($arn, $statementArn)) {
                         return true;
@@ -182,6 +221,26 @@ class Policy
         // Matching exact ARNs can save time.
         if ($resourceArn === $statementArn) {
             return true;
+        }
+
+        // If the resource ARNs are defined as wildcard, check if no actor
+        // or root account ID are bound to this instance.
+        if ($resourceArn === '*') {
+            if ($actor = $this->actor) {
+                $resourceArn = "arn:*:*:*:{$actor->resolveArnAccountId()}:*";
+            } else if ($rootAccountId = $this->rootAccountId) {
+                $resourceArn = "arn:*:*:*:{$rootAccountId}:*";
+            }
+        }
+
+        // If the statement ARNs are defined as wildcard, check if no actor
+        // or root account ID are bound to this instance.
+        if ($statementArn === '*') {
+            if ($actor = $this->actor) {
+                $statementArn = "arn:*:*:*:{$actor->resolveArnAccountId()}:*";
+            } else if ($rootAccountId = $this->rootAccountId) {
+                $statementArn = "arn:*:*:*:{$rootAccountId}:*";
+            }
         }
 
         $blocksFromArn = explode(':', $resourceArn);

@@ -3,7 +3,6 @@
 namespace RenokiCo\Acl;
 
 use Closure;
-use RenokiCo\Acl\Contracts\RuledByPolicies;
 
 class Acl
 {

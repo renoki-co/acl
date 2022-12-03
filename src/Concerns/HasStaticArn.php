@@ -2,7 +2,6 @@
 
 namespace RenokiCo\Acl\Concerns;
 
-use RenokiCo\Acl\Acl;
 use RenokiCo\Acl\Arn;
 use RenokiCo\Acl\Contracts\RuledByPolicies;
 
@@ -10,33 +9,26 @@ trait HasStaticArn
 {
     /**
      * This function does not return the real ARN of the resource!
-     * The returned value will be generated with help from the given actor,
-     * or from the one set using Acl::provideAccountIdInArns.
+     * The returned value will be generated with help from the given actor.
      *
      * The returned value is agnostic to any resource; it is usually
      * used to check if a specific actor can perform create or
      * list actions (for example), where the Account ID is required.
      *
-     * @param  null|RuledByPolicies  $actor
+     * @param  RuledByPolicies  $actor
      * @return string
      */
-    public static function resourceIdAgnosticArn(RuledByPolicies $actor = null): string
+    public static function resourceIdAgnosticArn(RuledByPolicies $actor): string
     {
         $arn = new Arn(
             partition: static::arnPartition(),
             service: static::arnService(),
-            region: static::arnRegion(),
-            accountId: value(function () use ($actor) {
-                if ($accountId = optional($actor)->resolveArnAccountId()) {
-                    return $accountId;
-                }
-
-                return static::arnAccountId();
-            }),
+            region: $actor->resolveArnRegion() ?: static::arnRegion(),
+            accountId: $actor->resolveArnAccountId(),
             resourceType: static::arnResourceType(),
         );
 
-        return $arn->getArn();
+        return $arn->toString();
     }
 
     /**
@@ -71,10 +63,6 @@ trait HasStaticArn
      */
     public static function arnRegion()
     {
-        if ($callback = Acl::getArnGenerationCallback('region')) {
-            return call_user_func($callback);
-        }
-
         return 'local';
     }
 
@@ -87,10 +75,6 @@ trait HasStaticArn
      */
     public static function arnAccountId()
     {
-        if ($callback = Acl::getArnGenerationCallback('accountId')) {
-            return call_user_func($callback);
-        }
-
         return '0';
     }
 

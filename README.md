@@ -49,26 +49,40 @@ class Account implements RuledByPolicies
     {
         return $this->id;
     }
+
+    /**
+     * Resolve the region of the current actor.
+     * This value will be used in ARNs for ARNable static instances,
+     * to see if the current actor can perform ID-agnostic resource actions.
+     *
+     * @return null|string|int
+     */
+    public function resolveArnRegion()
+    {
+        return $_GET['region'] ?? 'local';
+    }
 }
 ```
 
 Whenever you require the actor to check for permissions, you will have to load them up in its class. If you are using ORM/DTO, you can easily store them in the database alongside the actor itself, and you can pull the policies with it.
 
 ```php
+use RenokiCo\Acl\Acl;
+use RenokiCo\Acl\Statement;
+
 $policy = Acl::createPolicy([
-    [
-        'Effect' => 'Allow',
-        'Action' => 'server:List',
-        'Resource' => [
+    Statement::make(
+        effect: 'Allow',
+        action: 'server:List',
+        resource: [
             'arn:php:server-manager:local:123:server',
         ],
-    ],
+    ),
 ]);
 
 $account = Account::readFromDatabase('123');
 
-$account->loadPolicies([$policy]);
-
+$account->loadPolicies($policy);
 $account->isAllowedTo('server:List', 'arn:php:server-manager:local:123:server'); // true
 ```
 
@@ -95,21 +109,7 @@ Although the values do have defaults, you **must** let the ACL service know what
 
 For these values, you can take AWS' example: it lets you select the region (in console: by manually changing the region via the top-right selector; in the API: by specifying the `--region` parameter), and you must be authenticated to an account, in this case your current login session knows your Account ID.
 
-In ACL, before running any logic, you need to set up your login into a callable function that will return the proper value for either region or the account ID, in case of Resource-agnostic ARNs.
-
-```php
-use RenokiCo\Acl\Acl;
-
-Acl::provideAccountIdInArns(function () {
-    // i.e. Access the current user and retrieve its ID.
-    return currentUser()->id;
-});
-
-Acl::provideRegionInArns(function () {
-    // i.e. Retrieve the region if ?region=... exists.
-    return $_GET['region'] ?? 'local';
-});
-```
+In ACL, before running any logic, you need to set up the resolvers that will return the proper values in case of ARNs generated, from the Actor perspective.
 
 ### Using ARNables with actors
 
@@ -145,24 +145,24 @@ Instead of passing full ARNs to `->isAllowedTo`, you can now pass the server cla
 
 ```php
 $policy = Acl::createPolicy([
-    [
-        'Effect' => 'Allow',
-        'Action' => 'server:List',
-        'Resource' => [
+    Statement::make(
+        effect: 'Allow',
+        action: 'server:List',
+        resource: [
             'arn:php:server-manager:local:123:server',
         ],
-    ],
-    [
-        'Effect' => 'Allow',
-        'Action' => 'server:Delete',
-        'Resource' => [
+    ),
+    Statement::make(
+        effect: 'Allow',
+        action: 'server:Delete',
+        resource: [
             'arn:php:server-manager:local:123:server/1',
         ],
-    ],
+    ),
 ]);
 
 $account = Account::readFromDatabase('123');
-$account->loadPolicies([$policy]);
+$account->loadPolicies($policy);
 
 $account->isAllowedTo('server:List', Server::class); // true
 ```
@@ -210,7 +210,7 @@ Later on, checking permissions would work exactly the same way as before, but th
 
 ### Naming conventions, defaults and ARN parts
 
-Each `Arnable` instance is set, by default, to have their resoure name (which should be unique per service) based on the class base name.
+Each `Arnable` instance is set, by default, to have their resource name (which should be unique per service) based on the class base name.
 
 For example, a `Server` class is part of the `baremetal` service that serves customers with bare metals, IPs, Disks and more that can be used on Bare Metals. Its name as resource under that `baremetal` service is going to be `server`, and it would have an ARN like the following:
 
@@ -280,73 +280,74 @@ Make sure your `Action` reflects a unique prefix per resource. For example, take
 
 ```php
 $policy = Acl::createPolicy([
-    [
-        'Effect' => 'Allow',
-        'Action' => [
+    Statement::make(
+        effect: 'Allow',
+        action: [
             'server:List',
             'container:List',
         ],
-        'Resource' => [
+        resource: [
             'arn:php:server-manager:local:123:server',
             'arn:php:docker-manager:local:123:container',
         ],
-    ],
+    ),
 ]);
 
-$policy->allows('server:List', 'arn:php:server-manager:local:123:server'); // true
-$policy->allows('container:List', 'arn:php:docker-manager:local:123:container'); // true
+$account->isAllowedTo('server:List', 'arn:php:server-manager:local:123:server'); // true
+$account->isAllowedTo('container:List', 'arn:php:docker-manager:local:123:container'); // true
 ```
 
-### Avoid checking for `<arn>/*` with Resource-agnostic actions
+### Avoid checking for wildcards
 
 Some misunderstanding around the wildcard resources can go like this:
 
 ```php
 $policy = Acl::createPolicy([
-    [
-        'Effect' => 'Allow',
-        'Action' => 'server:List',
-        'Resource' => 'arn:php:server-manager:local:123:server/123',
-    ],
+    Statement::make(
+        effect: 'Allow',
+        action: 'server:List',
+        resource: 'arn:php:server-manager:local:123:server/123',
+    ),
 ]);
 
-$policy->allows('server:List', 'arn:php:server-manager:local:123:server/*');
+$account->isAllowedTo('server:List', 'arn:php:server-manager:local:123:server/*'); // Not allowed.
+
+$account->isAllowedTo('server:*', 'arn:php:server-manager:local:123:server/123'); // Not allowed too.
 ```
 
-In this case, the check will return `false`, but note that you're checking for all the servers by passing a wildcard `*`. The problem here is that you shoud never do that, as it's not relevant to check if the user "can list all the particular servers".
+In this case, calling any of the two checks will throw an `InvalidArnException` exception.
 
-Instead, use a better approach and define a statement without a specific resource for list commands, and define a statement with a specific resource for resource-individual actions, like `delete` or `shutdown`:
+Wildcard check is prevented by default, as it's not relevant to check if the user "can list all the particular servers", in order to reserve actions that make more sense on specific resources, and in the case of checks, we want to be super specfic about the action and/or resource.
+
+It's recommended to define a statement without a specific resource for list commands, and define a statement with a specific resource for resource-individual actions, like `delete` or `shutdown`:
 
 ```php
 $policy = Acl::createPolicy([
-    [
-        'Effect' => 'Allow',
-        'Action' => [
+    Statement::make(
+        effect: 'Allow',
+        action: [
             'server:List',
             'server:Create',
         ],
-        'Resource' => 'arn:php:server-manager:local:123:server',
-    ],
-    [
-        'Effect' => 'Allow',
-        'Action' => [
+        resource: 'arn:php:server-manager:local:123:server',
+    ),
+    Statement::make(
+        effect: 'Allow',
+        action: [
             'server:Describe',
             'server:Update',
             'server:Delete',
         ],
-        'Resource' => 'arn:php:server-manager:local:123:server/*',
-    ],
+        resource: 'arn:php:server-manager:local:123:server/*',
+    ),
 ]);
 
-// All five below will return true
+$account->isAllowedTo('server:List', 'arn:php:server-manager:local:123:server');
+$account->isAllowedTo('server:Create', 'arn:php:server-manager:local:123:server');
 
-$policy->allows('server:List', 'arn:php:server-manager:local:123:server');
-$policy->allows('server:Create', 'arn:php:server-manager:local:123:server');
-
-$policy->allows('server:Describe', 'arn:php:server-manager:local:123:server/123');
-$policy->allows('server:Update', 'arn:php:server-manager:local:123:server/123');
-$policy->allows('server:Delete', 'arn:php:server-manager:local:123:server/123');
-
+$account->isAllowedTo('server:Describe', 'arn:php:server-manager:local:123:server/123');
+$account->isAllowedTo('server:Update', 'arn:php:server-manager:local:123:server/123');
+$account->isAllowedTo('server:Delete', 'arn:php:server-manager:local:123:server/123');
 ```
 
 ## 🐛 Testing

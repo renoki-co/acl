@@ -29,7 +29,7 @@ trait HasArn
             resourceId: $this->arnResourceId(),
         );
 
-        return $arn->getArn();
+        return $arn->toString();
     }
 
     /**

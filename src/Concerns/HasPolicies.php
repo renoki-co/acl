@@ -3,6 +3,7 @@
 namespace RenokiCo\Acl\Concerns;
 
 use RenokiCo\Acl\Contracts\Arnable;
+use RenokiCo\Acl\Exceptions\WildcardNotPermittedException;
 
 trait HasPolicies
 {
@@ -16,15 +17,26 @@ trait HasPolicies
     /**
      * Load policies for this entity.
      *
-     * @param  array<int, \RenokiCo\Acl\Policy>  $policies
+     * @param  \RenokiCo\Acl\Policy  $policies
      * @return $this
      */
-    public function loadPolicies(array $policies)
+    public function loadPolicies(...$policies)
     {
+        /** @var \RenokiCo\Acl\Contracts\RuledByPolicies $this */
+
+        // Having an array passed, extract the first item.
+        if (
+            is_array($policies)
+            && is_array($policies[0])
+            && count($policies) === 1
+        ) {
+            $policies = $policies[0];
+        }
+
         $this->arnPolicies = $policies;
 
         foreach ($this->arnPolicies as &$policy) {
-            $policy->actingAs($this);
+            $policy->setRootAccount($this->resolveArnAccountId());
         }
 
         return $this;
@@ -32,16 +44,30 @@ trait HasPolicies
 
     /**
      * Check if this actor is able to perform a specific action.
-     * If there is any explicit deny that's matching the given action
-     * and ARN, it will return false.
      *
      * @param  string  $action
      * @param  string|Arnable  $arn
      * @return bool
+     *
+     * @throws WildcardNotPermittedException
      */
     public function isAllowedTo(string $action, string|Arnable $arn): bool
     {
-        $allowsWithoutAnyExplicitDeny = false;
+        if ($arn instanceof Arnable) {
+            $arn = $arn->toArn();
+        } elseif (is_string($arn) && class_exists($arn)) {
+            $arn = $arn::resourceIdAgnosticArn($this);
+        }
+
+        if (str_contains($action, '*') || str_contains($arn, '*')) {
+            throw new WildcardNotPermittedException(sprintf(
+                "Checking %s on %s is not permitted. Wildcards are not allowed.",
+                $action,
+                $arn,
+            ));
+        }
+
+        $atLeastOneAllowedWasHit = false;
 
         foreach ($this->arnPolicies as $policy) {
             if ($policy->explicitlyDenies($action, $arn)) {
@@ -49,11 +75,10 @@ trait HasPolicies
             }
 
             if ($policy->allows($action, $arn)) {
-                $allowsWithoutAnyExplicitDeny = true;
-                continue;
+                $atLeastOneAllowedWasHit = true;
             }
         }
 
-        return $allowsWithoutAnyExplicitDeny;
+        return $atLeastOneAllowedWasHit;
     }
 }

@@ -5,6 +5,23 @@ namespace RenokiCo\Acl;
 class Arn
 {
     /**
+     * Create a new instance of an ARN from a given string.
+     *
+     * @param  string  $arn
+     * @return Arn
+     */
+    public static function fromString(string $arn)
+    {
+        if ($arn === '*') {
+            return static::fromString('arn:*:*:*:*:*');
+        }
+
+        return new static(...array_values(
+            static::splitArn($arn),
+        ));
+    }
+
+    /**
      * Build the ARN based on the given pieces.
      *
      * @param  string|int|null  $partition
@@ -51,14 +68,49 @@ class Arn
      *
      * @return string
      */
-    public function getArn(): string
+    public function toString(): string
     {
         $arn = $this->getResourceArn();
 
-        if ($this->resourceId) {
+        if (! in_array($this->resourceId, ['', null])) {
             $arn .= "/{$this->resourceId}";
         }
 
         return $arn;
+    }
+
+    /**
+     * Split the given ARN into key-value pairs.
+     *
+     * @param  string  $arn
+     * @return array
+     */
+    public static function splitArn(string $arn)
+    {
+        preg_match(static::pattern(), $arn, $matches);
+
+        return collect($matches)
+            ->filter(fn ($v, $k) => is_string($k))
+            ->toArray();
+    }
+
+    /**
+     * The pattern used to detect the ARN parts.
+     *
+     * @return string
+     */
+    public static function pattern()
+    {
+        return '/^arn:(?P<Partition>[^:\n]*):(?P<Service>[^:\n]*):(?P<Region>[^:\n]*):(?P<AccountId>[^:\n]*):(?P<ResourceType>[^:\/\n]*)[:\/]?(?P<ResourceId>.*)$/';
+    }
+
+    /**
+     * Alias for ->toString().
+     *
+     * @return string
+     */
+    public function __toString()
+    {
+        return $this->toString();
     }
 }

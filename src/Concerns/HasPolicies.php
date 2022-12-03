@@ -61,7 +61,7 @@ trait HasPolicies
 
         if (str_contains($action, '*') || str_contains($arn, '*')) {
             throw new WildcardNotPermittedException(sprintf(
-                "Checking %s on %s is not permitted. Wildcards are not allowed.",
+                'Checking %s on %s is not permitted. Wildcards are not allowed.',
                 $action,
                 $arn,
             ));

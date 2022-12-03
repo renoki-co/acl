@@ -4,7 +4,6 @@ namespace RenokiCo\Acl;
 
 class Acl
 {
-
     /**
      * Create a policy from statements.
      *

@@ -75,7 +75,7 @@ $policy = Acl::createPolicy([
         effect: 'Allow',
         action: 'server:List',
         resource: [
-            'arn:php:server-manager:local:123:server',
+            'arn:php:local:local:123:server',
         ],
     ),
 ]);
@@ -83,7 +83,7 @@ $policy = Acl::createPolicy([
 $account = Account::readFromDatabase('123');
 
 $account->loadPolicies($policy);
-$account->isAllowedTo('server:List', 'arn:php:server-manager:local:123:server'); // true
+$account->isAllowedTo('server:List', 'arn:php:local:local:123:server'); // true
 ```
 
 ## 🧬 ARNables
@@ -92,13 +92,13 @@ PHP is more object-oriented. ARNables can help turn your classes, like DTOs or M
 
 ### Resource-agnostic ARN vs Resource ARN
 
-Resource-agnostic ARNs are the ones that are used for actions like `list` or `create`. They are not pointing to a specific resource, but rather to a "general" permission for that resource, that can lead to allowing listing or creating resources. For example, `arn:php:server-manager:local:123:server`.
+Resource-agnostic ARNs are the ones that are used for actions like `list` or `create`. They are not pointing to a specific resource, but rather to a "general" permission for that resource, that can lead to allowing listing or creating resources. For example, `arn:php:local:local:123:server`.
 
-Resource ARNs are the ARNs that point to a specific resource. Actions like `delete`, `modify` and such are good examples that can be used in combination with these ARNs. For example, `arn:php:server-manager:local:123:server/1` or `arn:php:server-manager:local:123:backup/1`.
+Resource ARNs are the ARNs that point to a specific resource. Actions like `delete`, `modify` and such are good examples that can be used in combination with these ARNs. For example, `arn:php:local:local:123:server/1` or `arn:php:local:local:123:backup/1`.
 
 ### Resolving the Region and Account IDs
 
-Let's take this ARN example: `arn:php:server-manager:local:123:server`.
+Let's take this ARN example: `arn:php:local:local:123:server`.
 
 Since this ARN is agnostic, the `Server` class cannot be properly converted to an ARN without two key components:
 
@@ -149,14 +149,14 @@ $policy = Acl::createPolicy([
         effect: 'Allow',
         action: 'server:List',
         resource: [
-            'arn:php:server-manager:local:123:server',
+            'arn:php:local:local:123:server',
         ],
     ),
     Statement::make(
         effect: 'Allow',
         action: 'server:Delete',
         resource: [
-            'arn:php:server-manager:local:123:server/1',
+            'arn:php:local:local:123:server/1',
         ],
     ),
 ]);
@@ -175,7 +175,7 @@ $server = Server::readFromDatabase('1');
 $account->isAllowedTo('server:Delete', $server); // true
 ```
 
-As you have seen previously, on the actor instances you can specify the account identifier for them. In an ARN like `arn:php:server-manager:local:123:server`, the part `123` is the account ID, or the account identifier. Thus, setting `resolveArnAccountId` to return `123`, the policies will allow the actor to `server:List` on that specific resource.
+As you have seen previously, on the actor instances you can specify the account identifier for them. In an ARN like `arn:php:local:local:123:server`, the part `123` is the account ID, or the account identifier. Thus, setting `resolveArnAccountId` to return `123`, the policies will allow the actor to `server:List` on that specific resource.
 
 ### Using ARNables with groups that contain actors
 
@@ -287,13 +287,13 @@ $policy = Acl::createPolicy([
             'container:List',
         ],
         resource: [
-            'arn:php:server-manager:local:123:server',
+            'arn:php:local:local:123:server',
             'arn:php:docker-manager:local:123:container',
         ],
     ),
 ]);
 
-$account->isAllowedTo('server:List', 'arn:php:server-manager:local:123:server'); // true
+$account->isAllowedTo('server:List', 'arn:php:local:local:123:server'); // true
 $account->isAllowedTo('container:List', 'arn:php:docker-manager:local:123:container'); // true
 ```
 
@@ -306,13 +306,13 @@ $policy = Acl::createPolicy([
     Statement::make(
         effect: 'Allow',
         action: 'server:List',
-        resource: 'arn:php:server-manager:local:123:server/123',
+        resource: 'arn:php:local:local:123:server/123',
     ),
 ]);
 
-$account->isAllowedTo('server:List', 'arn:php:server-manager:local:123:server/*'); // Not allowed.
+$account->isAllowedTo('server:List', 'arn:php:local:local:123:server/*'); // Not allowed.
 
-$account->isAllowedTo('server:*', 'arn:php:server-manager:local:123:server/123'); // Not allowed too.
+$account->isAllowedTo('server:*', 'arn:php:local:local:123:server/123'); // Not allowed too.
 ```
 
 In this case, calling any of the two checks will throw an `InvalidArnException` exception.
@@ -329,7 +329,7 @@ $policy = Acl::createPolicy([
             'server:List',
             'server:Create',
         ],
-        resource: 'arn:php:server-manager:local:123:server',
+        resource: 'arn:php:local:local:123:server',
     ),
     Statement::make(
         effect: 'Allow',
@@ -338,16 +338,16 @@ $policy = Acl::createPolicy([
             'server:Update',
             'server:Delete',
         ],
-        resource: 'arn:php:server-manager:local:123:server/*',
+        resource: 'arn:php:local:local:123:server/*',
     ),
 ]);
 
-$account->isAllowedTo('server:List', 'arn:php:server-manager:local:123:server');
-$account->isAllowedTo('server:Create', 'arn:php:server-manager:local:123:server');
+$account->isAllowedTo('server:List', 'arn:php:local:local:123:server');
+$account->isAllowedTo('server:Create', 'arn:php:local:local:123:server');
 
-$account->isAllowedTo('server:Describe', 'arn:php:server-manager:local:123:server/123');
-$account->isAllowedTo('server:Update', 'arn:php:server-manager:local:123:server/123');
-$account->isAllowedTo('server:Delete', 'arn:php:server-manager:local:123:server/123');
+$account->isAllowedTo('server:Describe', 'arn:php:local:local:123:server/123');
+$account->isAllowedTo('server:Update', 'arn:php:local:local:123:server/123');
+$account->isAllowedTo('server:Delete', 'arn:php:local:local:123:server/123');
 ```
 
 ## 🐛 Testing

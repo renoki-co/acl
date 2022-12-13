@@ -75,7 +75,7 @@ $policy = Acl::createPolicy([
         effect: 'Allow',
         action: 'server:List',
         resource: [
-            'arn:php:server-manager:local:123:server',
+            'arn:php:default:local:123:server',
         ],
     ),
 ]);
@@ -83,7 +83,7 @@ $policy = Acl::createPolicy([
 $account = Account::readFromDatabase('123');
 
 $account->loadPolicies($policy);
-$account->isAllowedTo('server:List', 'arn:php:server-manager:local:123:server'); // true
+$account->isAllowedTo('server:List', 'arn:php:default:local:123:server'); // true
 ```
 
 ## 🧬 ARNables
@@ -92,13 +92,13 @@ PHP is more object-oriented. ARNables can help turn your classes, like DTOs or M
 
 ### Resource-agnostic ARN vs Resource ARN
 
-Resource-agnostic ARNs are the ones that are used for actions like `list` or `create`. They are not pointing to a specific resource, but rather to a "general" permission for that resource, that can lead to allowing listing or creating resources. For example, `arn:php:server-manager:local:123:server`.
+Resource-agnostic ARNs are the ones that are used for actions like `list` or `create`. They are not pointing to a specific resource, but rather to a "general" permission for that resource, that can lead to allowing listing or creating resources. For example, `arn:php:default:local:123:server`.
 
-Resource ARNs are the ARNs that point to a specific resource. Actions like `delete`, `modify` and such are good examples that can be used in combination with these ARNs. For example, `arn:php:server-manager:local:123:server/1` or `arn:php:server-manager:local:123:backup/1`.
+Resource ARNs are the ARNs that point to a specific resource. Actions like `delete`, `modify` and such are good examples that can be used in combination with these ARNs. For example, `arn:php:default:local:123:server/1` or `arn:php:default:local:123:backup/1`.
 
 ### Resolving the Region and Account IDs
 
-Let's take this ARN example: `arn:php:server-manager:local:123:server`.
+Let's take this ARN example: `arn:php:default:local:123:server`.
 
 Since this ARN is agnostic, the `Server` class cannot be properly converted to an ARN without two key components:
 
@@ -149,14 +149,14 @@ $policy = Acl::createPolicy([
         effect: 'Allow',
         action: 'server:List',
         resource: [
-            'arn:php:server-manager:local:123:server',
+            'arn:php:default:local:123:server',
         ],
     ),
     Statement::make(
         effect: 'Allow',
         action: 'server:Delete',
         resource: [
-            'arn:php:server-manager:local:123:server/1',
+            'arn:php:default:local:123:server/1',
         ],
     ),
 ]);
@@ -175,7 +175,7 @@ $server = Server::readFromDatabase('1');
 $account->isAllowedTo('server:Delete', $server); // true
 ```
 
-As you have seen previously, on the actor instances you can specify the account identifier for them. In an ARN like `arn:php:server-manager:local:123:server`, the part `123` is the account ID, or the account identifier. Thus, setting `resolveArnAccountId` to return `123`, the policies will allow the actor to `server:List` on that specific resource.
+As you have seen previously, on the actor instances you can specify the account identifier for them. In an ARN like `arn:php:default:local:123:server`, the part `123` is the account ID, or the account identifier. Thus, setting `resolveArnAccountId` to return `123`, the policies will allow the actor to `server:List` on that specific resource.
 
 ### Using ARNables with groups that contain actors
 
@@ -266,6 +266,24 @@ class Server implements Arnable
 }
 ```
 
+To make it easier, consider the following table that breaks down the ARN into components and specifies which part is resolved by which code.
+
+The example ARN is `arn:php:baremetal:local:team-1:server(/*?)`, where `(/*?)` can be `/some-id` or not be present at all.
+
+The order in which they are resolved is the following, the latter overwriting the previous ones (if applicable and available):
+
+`Resource Agnostic` -> `Resource` -> `Actor modifier`
+
+| ARN Part  | ARN Name      | Resource Agnostic (static function)       | Resource                                        | Actor modifier          |  Details                                                                                                                        |
+|-----------|---------------|-------------------------------------------|-------------------------------------------------|-------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| arn       | Prefix        | N/A                                       | N/A                                             | N/A                     | This segment is not modifiable at all.                                                                                          |
+| php       | Partition     | `arnPartition()`                          | `arnResourcePartition()` (defaults to agnostic) | N/A                     | If you have multiple projects, assigning an unique name would be useful incase yo have cross-projects permissions.              |
+| baremetal | Service       | `arnResourceService()`                    | `arnService()` (defaults to agnostic)           | N/A                     | You can group multiple resources under the same Service (i.e. `Disk`, `Server` and `PrivateNetwork`)                            |
+| local     | Region        | `arnRegion()`                             | `arnResourceRegion()` (defaults to agnostic)    | `resolveArnRegion()`    | The region this resource belongs to. If none is provided, it assumes the current set one (assuming you handle the actor region) |
+| team-1    | Account ID    | Value is injected at check from an actor. | `arnResourceAccountId()`                        | `resolveArnAccountId()` | The account ID the resources belong to. It's resolved at check by the actor logic.                                              |
+| server    | Resource Name | `arnResourceType()`                       | Same as agnostic.                               | N/A                     | The resource type name. It should be unique per defined Service, although the short model name is used.                         |
+| (/*?)     | Resource ID   | N/A                                       | `arnResourceId()`                               | N/A                     | The resource ID, if applicable. It's resolved at the ARNable instance, and it's usually the primary key of the model.           |
+
 ## 🏘 Cross-account permissions
 
 Some AWS services do support cross-account permissions. For example, you can allow any other actor (`Account`) to interact with your services without explicitly allowing to access your account or to join your team. Policies should be configured to specify any actor identifier to the ARN.
@@ -287,13 +305,13 @@ $policy = Acl::createPolicy([
             'container:List',
         ],
         resource: [
-            'arn:php:server-manager:local:123:server',
+            'arn:php:default:local:123:server',
             'arn:php:docker-manager:local:123:container',
         ],
     ),
 ]);
 
-$account->isAllowedTo('server:List', 'arn:php:server-manager:local:123:server'); // true
+$account->isAllowedTo('server:List', 'arn:php:default:local:123:server'); // true
 $account->isAllowedTo('container:List', 'arn:php:docker-manager:local:123:container'); // true
 ```
 
@@ -306,13 +324,13 @@ $policy = Acl::createPolicy([
     Statement::make(
         effect: 'Allow',
         action: 'server:List',
-        resource: 'arn:php:server-manager:local:123:server/123',
+        resource: 'arn:php:default:local:123:server/123',
     ),
 ]);
 
-$account->isAllowedTo('server:List', 'arn:php:server-manager:local:123:server/*'); // Not allowed.
+$account->isAllowedTo('server:List', 'arn:php:default:local:123:server/*'); // Not allowed.
 
-$account->isAllowedTo('server:*', 'arn:php:server-manager:local:123:server/123'); // Not allowed too.
+$account->isAllowedTo('server:*', 'arn:php:default:local:123:server/123'); // Not allowed too.
 ```
 
 In this case, calling any of the two checks will throw an `InvalidArnException` exception.
@@ -329,7 +347,7 @@ $policy = Acl::createPolicy([
             'server:List',
             'server:Create',
         ],
-        resource: 'arn:php:server-manager:local:123:server',
+        resource: 'arn:php:default:local:123:server',
     ),
     Statement::make(
         effect: 'Allow',
@@ -338,16 +356,16 @@ $policy = Acl::createPolicy([
             'server:Update',
             'server:Delete',
         ],
-        resource: 'arn:php:server-manager:local:123:server/*',
+        resource: 'arn:php:default:local:123:server/*',
     ),
 ]);
 
-$account->isAllowedTo('server:List', 'arn:php:server-manager:local:123:server');
-$account->isAllowedTo('server:Create', 'arn:php:server-manager:local:123:server');
+$account->isAllowedTo('server:List', 'arn:php:default:local:123:server');
+$account->isAllowedTo('server:Create', 'arn:php:default:local:123:server');
 
-$account->isAllowedTo('server:Describe', 'arn:php:server-manager:local:123:server/123');
-$account->isAllowedTo('server:Update', 'arn:php:server-manager:local:123:server/123');
-$account->isAllowedTo('server:Delete', 'arn:php:server-manager:local:123:server/123');
+$account->isAllowedTo('server:Describe', 'arn:php:default:local:123:server/123');
+$account->isAllowedTo('server:Update', 'arn:php:default:local:123:server/123');
+$account->isAllowedTo('server:Delete', 'arn:php:default:local:123:server/123');
 ```
 
 ## 🐛 Testing

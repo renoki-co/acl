@@ -3,10 +3,12 @@
 namespace RenokiCo\Acl\Test;
 
 use RenokiCo\Acl\Acl;
+use RenokiCo\Acl\Concerns\HasArn;
+use RenokiCo\Acl\Concerns\HasPolicies;
+use RenokiCo\Acl\Contracts\Arnable;
+use RenokiCo\Acl\Contracts\RuledByPolicies;
 use RenokiCo\Acl\Exceptions\WildcardNotPermittedException;
 use RenokiCo\Acl\Statement;
-use RenokiCo\Acl\Test\Fixtures\User;
-use RenokiCo\Acl\Test\Fixtures\Vps;
 
 class ActorPolicyTest extends TestCase
 {
@@ -295,5 +297,50 @@ class ActorPolicyTest extends TestCase
 
         $user = new User('user-1');
         $user->loadPolicies([$policy]);
+    }
+}
+
+class User implements RuledByPolicies
+{
+    use HasPolicies;
+
+    public function __construct(
+        public string $id,
+        public string $team = 'team-1',
+        public string $region = 'local',
+    ) {
+        //
+    }
+
+    public function resolveArnAccountId()
+    {
+        return $this->team;
+    }
+
+    public function resolveArnRegion()
+    {
+        return $this->region;
+    }
+}
+
+class Vps implements Arnable
+{
+    use HasArn;
+
+    public function __construct(
+        public string $id = 'vps-000',
+        public string $team = 'team-1',
+    ) {
+        //
+    }
+
+    public function arnResourceAccountId()
+    {
+        return $this->team;
+    }
+
+    public function arnResourceId()
+    {
+        return $this->id;
     }
 }

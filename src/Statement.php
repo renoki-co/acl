@@ -200,7 +200,7 @@ class Statement implements Arrayable
     /**
      * Get the instance as an array.
      *
-     * @return array<TKey, TValue>
+     * @return array
      */
     public function toArray()
     {

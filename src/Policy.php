@@ -2,10 +2,11 @@
 
 namespace RenokiCo\Acl;
 
+use Illuminate\Contracts\Support\Arrayable;
 use RenokiCo\Acl\Concerns\HasRootAccountId;
 use RenokiCo\Acl\Contracts\Arnable;
 
-class Policy
+class Policy implements Arrayable
 {
     use HasRootAccountId;
 
@@ -65,5 +66,34 @@ class Policy
         }
 
         return false;
+    }
+
+    /**
+     * Instantiate the Policy class from a serialized array version.
+     *
+     * @param  array  $arrayedPolicy
+     * @return static
+     */
+    public static function fromArray(array $arrayedPolicy)
+    {
+        return new static(
+            statement: collect($arrayedPolicy['statement'] ?? [])->map(function ($statement) {
+                return Statement::fromArray($statement);
+            })->all(),
+            rootAccountId: $arrayedPolicy['rootAccountId'] ?? null,
+        );
+    }
+
+    /**
+     * Get the instance as an array.
+     *
+     * @return array<TKey, TValue>
+     */
+    public function toArray()
+    {
+        return [
+            'statement' => collect($this->statement)->toArray(),
+            'rootAccountId' => $this->rootAccountId,
+        ];
     }
 }

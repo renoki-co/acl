@@ -2,11 +2,12 @@
 
 namespace RenokiCo\Acl;
 
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use RenokiCo\Acl\Concerns\HasRootAccountId;
 
-class Statement
+class Statement implements Arrayable
 {
     use HasRootAccountId;
 
@@ -14,8 +15,8 @@ class Statement
      * Create a new statement.
      *
      * @param  string  $effect
-     * @param  string|array  $action
-     * @param  string|array  $resource
+     * @param  string|array<int, string>  $action
+     * @param  string|array<int, string>  $resource
      * @param  string|int|null  $rootAccountId
      * @return Statement
      */
@@ -183,5 +184,31 @@ class Statement
         }
 
         return false;
+    }
+
+    /**
+     * Instantiate the Statement class from a serialized array version.
+     *
+     * @param  array  $arrayedStatement
+     * @return static
+     */
+    public static function fromArray(array $arrayedStatement)
+    {
+        return new static(...$arrayedStatement);
+    }
+
+    /**
+     * Get the instance as an array.
+     *
+     * @return array<TKey, TValue>
+     */
+    public function toArray()
+    {
+        return [
+            'effect' => $this->effect,
+            'action' => $this->action,
+            'resource' => $this->resource,
+            'rootAccountId' => $this->rootAccountId,
+        ];
     }
 }

@@ -22,6 +22,8 @@ class ActorPolicyTest extends TestCase
         $user = new User('user-1', team: 'team-1');
         $user->loadPolicies($policy);
 
+        $this->testPoliciesSerialization($user->arnPolicies);
+
         $this->expectException(WildcardNotPermittedException::class);
         $user->isAllowedTo('*', '*');
         $this->expectException('');
@@ -63,6 +65,8 @@ class ActorPolicyTest extends TestCase
         $user = new User('user-1', team: 'team-1');
         $user->loadPolicies($policy);
 
+        $this->testPoliciesSerialization($user->arnPolicies);
+
         $this->assertTrue($user->isAllowedTo('vps:Read', new Vps('vps-000', team: 'team-1')));
         $this->assertTrue($user->isAllowedTo('vps:Read', new Vps('vps-000', team: 'team-1')));
         $this->assertTrue($user->isAllowedTo('vps:List', Vps::class));
@@ -88,6 +92,8 @@ class ActorPolicyTest extends TestCase
 
         $user = new User('user-1', team: 'team-1');
         $user->loadPolicies($policy);
+
+        $this->testPoliciesSerialization($user->arnPolicies);
 
         $this->assertTrue($user->isAllowedTo('vps:Read', new Vps('vps-000', team: 'team-1')));
         $this->assertTrue($user->isAllowedTo('vps:List', Vps::class));
@@ -116,6 +122,8 @@ class ActorPolicyTest extends TestCase
         $user = new User('user-1');
         $user->loadPolicies([$policy]);
 
+        $this->testPoliciesSerialization($user->arnPolicies);
+
         $this->assertTrue($user->isAllowedTo('vps:List', Vps::class));
         $this->assertTrue($user->isAllowedTo('vps:Describe', new Vps('vps-000', team: 'team-1')));
 
@@ -137,6 +145,8 @@ class ActorPolicyTest extends TestCase
 
         $user = new User('user-1');
         $user->loadPolicies([$policy]);
+
+        $this->testPoliciesSerialization($user->arnPolicies);
 
         $this->assertTrue($user->isAllowedTo('vps:Describe', new Vps('vps-000', team: 'team-1')));
         $this->assertFalse($user->isAllowedTo('vps:Describe', new Vps('vps-111', team: 'team-2')));
@@ -166,6 +176,8 @@ class ActorPolicyTest extends TestCase
         $user = new User('user-1');
         $user->loadPolicies([$policy]);
 
+        $this->testPoliciesSerialization($user->arnPolicies);
+
         $this->assertFalse($user->isAllowedTo('vps:Describe', new Vps('vps-000', team: 'team-1')));
         $this->assertFalse($user->isAllowedTo('vps:Describe', new Vps('vps-000', team: 'team-2')));
         $this->assertFalse($user->isAllowedTo('vps:Describe', Vps::class));
@@ -191,6 +203,8 @@ class ActorPolicyTest extends TestCase
 
         $user = new User('user-1');
         $user->loadPolicies([$policy]);
+
+        $this->testPoliciesSerialization($user->arnPolicies);
 
         $this->assertTrue($user->isAllowedTo('vps:List', 'arn:php:local:local:team-1:vps'));
         $this->assertFalse($user->isAllowedTo('vps:List', 'arn:php:local:local:team-2:vps'));
@@ -221,6 +235,8 @@ class ActorPolicyTest extends TestCase
         $user = new User('user-1');
         $user->loadPolicies([$policy]);
 
+        $this->testPoliciesSerialization($user->arnPolicies);
+
         $this->assertFalse($user->isAllowedTo('vps:Describe', 'arn:php:default:local:team-1:vps/vps-000'));
         $this->assertFalse($user->isAllowedTo('vps:Describe', 'arn:php:default:local:team-2:vps/vps-000'));
         $this->assertTrue($user->isAllowedTo('vps:Describe', 'arn:php:default:local:team-1:vps/vps-111'));
@@ -250,6 +266,8 @@ class ActorPolicyTest extends TestCase
 
         $user = new User('user-1');
         $user->loadPolicies([$policy]);
+
+        $this->testPoliciesSerialization($user->arnPolicies);
 
         $this->assertTrue($user->isAllowedTo('vps:Describe', 'arn:php:default:local:team-1:vps/vps-000'));
         $this->assertFalse($user->isAllowedTo('vps:Describe', 'arn:php:default:local:team-2:vps/vps-000'));

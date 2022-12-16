@@ -27,10 +27,10 @@ class Statement implements Arrayable
         $rootAccountId = null,
     ) {
         return new Statement(
-            $effect,
-            $action,
-            $resource,
-            $rootAccountId,
+            effect: $effect,
+            action: $action,
+            resource: $resource,
+            rootAccountId: $rootAccountId,
         );
     }
 

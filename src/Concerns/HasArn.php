@@ -3,7 +3,6 @@
 namespace RenokiCo\Acl\Concerns;
 
 use RenokiCo\Acl\Arn;
-use Illuminate\Support\Str;
 
 trait HasArn
 {

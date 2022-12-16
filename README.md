@@ -86,6 +86,42 @@ $account->loadPolicies($policy);
 $account->isAllowedTo('server:List', 'arn:php:default:local:123:server'); // true
 ```
 
+### Subpathing
+
+Some of your resources might allow subpathing, like having a disk where you would want to allow certain users to access certain files within that disk.
+
+```php
+$policy = Acl::createPolicy([
+    Statement::make(
+        effect: 'Allow',
+        action: 'disk:ReadFile',
+        resource: [
+            'arn:php:default:local:123:disk/etc/*',
+        ],
+    ),
+]);
+
+$account->isAllowedTo('disk:ReadFile', 'arn:php:default:local:123:disk/etc/hosts'); // true
+$account->isAllowedTo('disk:ReadFile', 'arn:php:default:local:123:disk/var/log/httpd.log'); // false
+```
+
+In case you would have a `disk:ListFilesAndFolders` action, keep in mind that subpaths must end with `/` to match the pattern:
+
+```php
+$policy = Acl::createPolicy([
+    Statement::make(
+        effect: 'Allow',
+        action: 'disk:ListFilesAndFolders',
+        resource: [
+            'arn:php:default:local:123:disk/etc/*',
+        ],
+    ),
+]);
+
+$account->isAllowedTo('disk:ListFilesAndFolders', 'arn:php:default:local:123:disk/etc/'); // true
+$account->isAllowedTo('disk:ListFilesAndFolders', 'arn:php:default:local:123:disk/etc'); // false
+```
+
 ## 🧬 ARNables
 
 PHP is more object-oriented. ARNables can help turn your classes, like DTOs or Models, into a simpler version of ARNs, so you don't have to write all your ARNs each time, but instead pass them to the `isAllowedTo()` method, depending on either it's an ARN that is resource-agnostic, or an ARN that points to a specific resource.

@@ -283,20 +283,65 @@ class ActorPolicyTest extends TestCase
         $this->assertFalse($user->isAllowedTo('vps:Shutdown', 'arn:php:default:local:team-2:vps/vps-000'));
     }
 
-    public function add()
+    public function test_actor_policy_allows_subpathing()
     {
         $policy = Acl::createPolicy([
             Statement::make(
-                action: [
-                    'vps:List',
-                    'vps:Describe',
+                effect: 'Allow',
+                action: 'bucket:ListFiles',
+                resource: [
+                    'arn:php:default:local:*:bucket/bucket-000/user1/*',
                 ],
-                resource: '*',
             ),
         ]);
 
         $user = new User('user-1');
         $user->loadPolicies([$policy]);
+
+        $this->testPoliciesSerialization($user->arnPolicies);
+
+        $this->assertTrue($user->isAllowedTo('bucket:ListFiles', 'arn:php:default:local:team-1:bucket/bucket-000/user1/'));
+        $this->assertTrue($user->isAllowedTo('bucket:ListFiles', 'arn:php:default:local:team-1:bucket/bucket-000/user1/folder1'));
+        $this->assertTrue($user->isAllowedTo('bucket:ListFiles', 'arn:php:default:local:team-1:bucket/bucket-000/user1/folder1/'));
+
+        $this->assertFalse($user->isAllowedTo('bucket:ListFiles', 'arn:php:default:local:team-1:bucket/bucket-000/user2/'));
+        $this->assertFalse($user->isAllowedTo('bucket:ListFiles', 'arn:php:default:local:team-1:bucket/bucket-000/user2/folder1'));
+        $this->assertFalse($user->isAllowedTo('bucket:ListFiles', 'arn:php:default:local:team-1:bucket/bucket-000/user2/folder1/'));
+    }
+
+    public function test_actor_policy_allows_subpathing_via_arnable()
+    {
+        $policy = Acl::createPolicy([
+            Statement::make(
+                effect: 'Allow',
+                action: 'bucket:ListFiles',
+                resource: [
+                    'arn:php:default:local:*:bucket/bucket-000/user1/*',
+                ],
+            ),
+            Statement::make(
+                effect: 'Allow',
+                action: 'bucket:GetObject',
+                resource: [
+                    'arn:php:default:local:*:bucket/bucket-000/user1.json',
+                ],
+            ),
+        ]);
+
+        $user = new User('user-1');
+        $user->loadPolicies([$policy]);
+
+        $this->testPoliciesSerialization($user->arnPolicies);
+
+        $this->assertTrue($user->isAllowedTo('bucket:ListFiles', (new Bucket(id: 'bucket-000', team: 'team-1'))->withArnSubpathing('user1/')));
+        $this->assertTrue($user->isAllowedTo('bucket:ListFiles', (new Bucket(id: 'bucket-000', team: 'team-1'))->withArnSubpathing('user1/folder1')));
+        $this->assertTrue($user->isAllowedTo('bucket:ListFiles', (new Bucket(id: 'bucket-000', team: 'team-1'))->withArnSubpathing('user1/folder1/')));
+        $this->assertTrue($user->isAllowedTo('bucket:GetObject', (new Bucket(id: 'bucket-000', team: 'team-1'))->withArnSubpathing('user1.json')));
+
+        $this->assertFalse($user->isAllowedTo('bucket:ListFiles', (new Bucket(id: 'bucket-000', team: 'team-1'))->withArnSubpathing('user2/')));
+        $this->assertFalse($user->isAllowedTo('bucket:ListFiles', (new Bucket(id: 'bucket-000', team: 'team-1'))->withArnSubpathing('user2/folder1')));
+        $this->assertFalse($user->isAllowedTo('bucket:ListFiles', (new Bucket(id: 'bucket-000', team: 'team-1'))->withArnSubpathing('user2/folder1/')));
+        $this->assertFalse($user->isAllowedTo('bucket:GetObject', (new Bucket(id: 'bucket-000', team: 'team-1'))->withArnSubpathing('user2.json')));
     }
 }
 
@@ -329,6 +374,28 @@ class Vps implements Arnable
 
     public function __construct(
         public string $id = 'vps-000',
+        public string $team = 'team-1',
+    ) {
+        //
+    }
+
+    public function arnResourceAccountId()
+    {
+        return $this->team;
+    }
+
+    public function arnResourceId()
+    {
+        return $this->id;
+    }
+}
+
+class Bucket implements Arnable
+{
+    use HasArn;
+
+    public function __construct(
+        public string $id = 'bucket-000',
         public string $team = 'team-1',
     ) {
         //

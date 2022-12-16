@@ -3,6 +3,7 @@
 namespace RenokiCo\Acl\Concerns;
 
 use RenokiCo\Acl\Arn;
+use Illuminate\Support\Str;
 
 trait HasArn
 {
@@ -15,21 +16,43 @@ trait HasArn
      * action on this resource, it will try to match this returned
      * value with their policies.
      *
+     * @param  string|int|null  $subPath
      * @return string
      */
-    public function toArn(): string
+    public function toArn(string|int|null $subPath = null): string
+    {
+        return $this->generateArnInstance($subPath)->toString();
+    }
+
+    /**
+     * Retrieve the resource ARN with a subpath.
+     *
+     * @param  string  $subPath
+     * @return string
+     */
+    public function withArnSubpathing(string $subPath)
+    {
+        return $this->toArn($subPath);
+    }
+
+    /**
+     * Generate the ARN instance for this resource.
+     *
+     * @param  string|int|null  $subPath
+     * @return \RenokiCo\Acl\Arn
+     */
+    public function generateArnInstance(string|int|null $subPath = null)
     {
         /** @var \RenokiCo\Acl\Contracts\Arnable&HasArn $this */
-        $arn = new Arn(
+        return new Arn(
             partition: $this->arnResourcePartition(),
             service: $this->arnResourceService(),
             region: $this->arnResourceRegion(),
             accountId: $this->arnResourceAccountId(),
             resourceType: static::arnResourceType(),
             resourceId: $this->arnResourceId(),
+            subPath: $subPath,
         );
-
-        return $arn->toString();
     }
 
     /**

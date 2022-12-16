@@ -177,6 +177,56 @@ $account->isAllowedTo('server:Delete', $server); // true
 
 As you have seen previously, on the actor instances you can specify the account identifier for them. In an ARN like `arn:php:default:local:123:server`, the part `123` is the account ID, or the account identifier. Thus, setting `resolveArnAccountId` to return `123`, the policies will allow the actor to `server:List` on that specific resource.
 
+### Subpathing
+
+Some of your resources might allow subpathing, like having a disk where you would want to allow certain users to access certain files within that disk.
+
+```php
+$policy = Acl::createPolicy([
+    Statement::make(
+        effect: 'Allow',
+        action: 'disk:ReadFile',
+        resource: [
+            'arn:php:default:local:123:disk/etc/*',
+        ],
+    ),
+]);
+
+$account->isAllowedTo('disk:ReadFile', 'arn:php:default:local:123:disk/etc/hosts'); // true
+$account->isAllowedTo('disk:ReadFile', 'arn:php:default:local:123:disk/var/log/httpd.log'); // false
+```
+
+In case you would have a `disk:ListFilesAndFolders` action, keep in mind that subpaths must end with `/` to match the pattern:
+
+```php
+$policy = Acl::createPolicy([
+    Statement::make(
+        effect: 'Allow',
+        action: 'disk:ListFilesAndFolders',
+        resource: [
+            'arn:php:default:local:123:disk/etc/*',
+        ],
+    ),
+]);
+
+$account->isAllowedTo('disk:ListFilesAndFolders', 'arn:php:default:local:123:disk/etc/'); // true
+$account->isAllowedTo('disk:ListFilesAndFolders', 'arn:php:default:local:123:disk/etc'); // false
+```
+
+### Subpathing with ARNables
+
+> *In case it was not obvious, subpathing is not supported for resource-agnostic ARNs.*
+
+ARNables return their ARN with subpathing by calling `->withArnSubpathing()`:
+
+```php
+// 'arn:php:default:local:123:disk/etc/hosts'
+$account->isAllowedTo('disk:ReadFile', $disk->withArnSubpathing('etc/hosts'));
+
+// 'arn:php:default:local:123:disk/etc/'
+$account->isAllowedTo('disk:ReadFile', $disk->withArnSubpathing('etc/'));
+```
+
 ### Using ARNables with groups that contain actors
 
 On a more complex note, having a model that groups more actors, like a `Team` having more `Account`s, you'd still need to implement the policy checking at the user level, but with regard to resolving the "account ID" to be more like Team ID, as long as the resources are created under `Team`.

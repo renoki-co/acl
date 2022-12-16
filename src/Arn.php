@@ -30,6 +30,7 @@ class Arn
      * @param  string|int|null  $accountId
      * @param  string|int|null  $resourceType
      * @param  string|int|null  $resourceId
+     * @param  string|int|null  $subPath
      * @return void
      */
     public function __construct(
@@ -39,6 +40,7 @@ class Arn
         public string|int|null $accountId = '0',
         public string|int|null $resourceType = null,
         public string|int|null $resourceId = null,
+        public string|int|null $subPath = null,
     ) {
         //
     }
@@ -72,8 +74,15 @@ class Arn
     {
         $arn = $this->getResourceArn();
 
-        if (! in_array($this->resourceId, ['', null])) {
-            $arn .= "/{$this->resourceId}";
+        $paths = [
+            $this->resourceId,
+            $this->subPath,
+        ];
+
+        foreach ($paths as $path) {
+            if (! in_array($path, ['', null])) {
+                $arn .= "/{$path}";
+            }
         }
 
         return $arn;

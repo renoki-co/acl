@@ -343,6 +343,199 @@ class ActorPolicyTest extends TestCase
         $this->assertFalse($user->isAllowedTo('bucket:ListFiles', (new Bucket(id: 'bucket-000', team: 'team-1'))->withArnSubpathing('user2/folder1/')));
         $this->assertFalse($user->isAllowedTo('bucket:GetObject', (new Bucket(id: 'bucket-000', team: 'team-1'))->withArnSubpathing('user2.json')));
     }
+
+    public function test_can_get_query_except()
+    {
+        $policy = Acl::createPolicy([
+            Statement::make(
+                action: 'vps:List',
+                resource: [
+                    'arn:php:default:local:team-1:vps',
+                    'arn:php:default:local:team-1:vps/*',
+                    'arn:php:default:local:team-2:vps/*',
+                    'arn:php:default:local:team-1:vps/vps-000',
+                ],
+            ),
+            Statement::make(
+                effect: 'Deny',
+                action: 'vps:List',
+                resource: [
+                    'arn:php:default:local:team-1:vps/vps-000',
+                ],
+            ),
+            Statement::make(
+                effect: 'Deny',
+                action: 'vps:List',
+                resource: [
+                    'arn:php:default:local:team-1:vps/vps-001',
+                ],
+            ),
+        ]);
+
+        $user = new User('user-1');
+        $user->loadPolicies([$policy]);
+
+        $this->testPoliciesSerialization($user->arnPolicies);
+
+        $this->assertEquals(
+            [
+                'except' => [
+                    'vps-000',
+                    'vps-001',
+                ],
+            ],
+            $user->getQuery('vps:List', Vps::class),
+        );
+    }
+
+    public function test_can_get_query_only()
+    {
+        $policy = Acl::createPolicy([
+            Statement::make(
+                action: 'vps:List',
+                resource: [
+                    'arn:php:default:local:team-1:vps/vps-000',
+                    'arn:php:default:local:team-1:vps/vps-001',
+                    'arn:php:default:local:team-1:bucket/bucket-000',
+                    'arn:php:default:local:team-2:vps/vps-002',
+                ],
+            ),
+            Statement::make(
+                effect: 'Deny',
+                action: 'vps:List',
+                resource: [
+                    'arn:php:default:local:team-1:vps/vps-001',
+                ],
+            ),
+        ]);
+
+        $user = new User('user-1');
+        $user->loadPolicies([$policy]);
+
+        $this->testPoliciesSerialization($user->arnPolicies);
+
+        $this->assertEquals(
+            [
+                'only' => [
+                    'vps-000',
+                ],
+            ],
+            $user->getQuery('vps:List', Vps::class),
+        );
+    }
+
+    public function test_can_get_query_all()
+    {
+        $policy = Acl::createPolicy([
+            Statement::make(
+                action: 'vps:List',
+                resource: [
+                    'arn:php:default:local:team-1:vps/*',
+                ],
+            ),
+        ]);
+
+        $user = new User('user-1');
+        $user->loadPolicies([$policy]);
+
+        $this->testPoliciesSerialization($user->arnPolicies);
+
+        $this->assertEquals(
+            [
+                'except' => [],
+            ],
+            $user->getQuery('vps:List', Vps::class),
+        );
+    }
+
+    public function test_can_get_query_all_without_resource_id()
+    {
+        $policy = Acl::createPolicy([
+            Statement::make(
+                action: 'vps:List',
+                resource: [
+                    'arn:php:default:local:team-1:vps',
+                ],
+            ),
+        ]);
+
+        $user = new User('user-1');
+        $user->loadPolicies([$policy]);
+
+        $this->testPoliciesSerialization($user->arnPolicies);
+
+        $this->assertEquals(
+            [
+                'only' => [],
+            ],
+            $user->getQuery('vps:List', Vps::class),
+        );
+    }
+
+    public function test_can_get_query_all_wildcard_action()
+    {
+        $policy = Acl::createPolicy([
+            Statement::make(
+                action: '*',
+                resource: [
+                    'arn:php:default:local:team-1:vps/*',
+                ],
+            ),
+        ]);
+
+        $user = new User('user-1');
+        $user->loadPolicies([$policy]);
+
+        $this->testPoliciesSerialization($user->arnPolicies);
+
+        $this->assertEquals(
+            [
+                'except' => [],
+            ],
+            $user->getQuery('vps:List', Vps::class),
+        );
+    }
+
+    public function test_can_get_query_nothing()
+    {
+        $policy = Acl::createPolicy([
+            Statement::make(
+                action: 'vps:List',
+                resource: [
+                    'arn:php:default:local:team-1:vps/*',
+                ],
+            ),
+        ]);
+
+        $user = new User('user-1');
+        $user->loadPolicies([$policy]);
+
+        $this->testPoliciesSerialization($user->arnPolicies);
+
+        $this->assertEquals(
+            [
+                'except' => [],
+            ],
+            $user->getQuery('vps:List', Vps::class),
+        );
+    }
+
+    public function test_can_get_query_nothing_matched()
+    {
+        $policy = Acl::createPolicy([]);
+
+        $user = new User('user-1');
+        $user->loadPolicies([$policy]);
+
+        $this->testPoliciesSerialization($user->arnPolicies);
+
+        $this->assertEquals(
+            [
+                'only' => [],
+            ],
+            $user->getQuery('vps:List', Vps::class),
+        );
+    }
 }
 
 class User implements RuledByPolicies

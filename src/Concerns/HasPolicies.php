@@ -2,6 +2,8 @@
 
 namespace RenokiCo\Acl\Concerns;
 
+use Illuminate\Support\Arr;
+use RenokiCo\Acl\Arn;
 use RenokiCo\Acl\Contracts\Arnable;
 use RenokiCo\Acl\Exceptions\WildcardNotPermittedException;
 
@@ -80,5 +82,85 @@ trait HasPolicies
         }
 
         return $atLeastOneAllowedWasHit;
+    }
+
+
+    /**
+     * @throws WildcardNotPermittedException
+     */
+    public function getQuery(string $action, string|Arnable $arn = null): array
+    {
+        if ($arn instanceof Arnable) {
+            $arn = $arn->toArn();
+        } elseif (is_string($arn) && class_exists($arn)) {
+            $arn = $arn::resourceIdAgnosticArn($this);
+        }
+
+        if (str_contains($action, '*') || str_contains($arn, '*')) {
+            throw new WildcardNotPermittedException(sprintf(
+                'Checking %s on %s is not permitted. Wildcards are not allowed.',
+                $action,
+                $arn,
+            ));
+        }
+
+        $resource = Arn::fromString($arn);
+
+        $effects = [];
+
+        foreach ($this->arnPolicies as $policy) {
+            foreach ($policy->statement as $statement) {
+                if(!$statement->passesAction($action)) {
+                    continue;
+                }
+
+                foreach ($statement->resource as $resourcePattern) {
+                    $arn = Arn::fromString($resourcePattern);
+
+                    if($resource->partition !== $arn->partition && $arn->partition !== '*') {
+                        continue;
+                    }
+
+                    if($resource->service !== $arn->service && $arn->service !== '*') {
+                        continue;
+                    }
+
+                    if($resource->region !== $arn->region && $arn->region !== '*') {
+                        continue;
+                    }
+
+                    if($resource->accountId !== $arn->accountId && $arn->accountId !== '*') {
+                        continue;
+                    }
+
+                    if($resource->resourceType !== $arn->resourceType && $arn->resourceType !== '*') {
+                        continue;
+                    }
+
+                    if($arn->resourceId == null) {
+                        continue;
+                    }
+
+                    $effects[$statement->effect === 'Allow' ? 'allow' : 'deny'][] = $arn->resourceId;
+                }
+            }
+        }
+
+        $deny = collect($effects['deny'] ?? [])->unique();
+        $allow = collect($effects['allow'] ?? [])->unique();
+
+        if($deny->contains('*')) {
+            return [
+                'only' => [],
+            ];
+        } elseif($allow->contains('*')) {
+            return [
+                'except' => $deny->toArray(),
+            ];
+        } else {
+            return [
+                'only' => $allow->diff($deny)->values()->toArray(),
+            ];
+        }
     }
 }

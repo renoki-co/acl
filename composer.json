@@ -29,7 +29,7 @@
         "test": "vendor/bin/phpunit"
     },
     "require-dev": {
-        "orchestra/testbench": "^7.14",
+        "orchestra/testbench": "^7.25",
         "orchestra/testbench-core": "^7.14",
         "phpunit/phpunit": "^9.5.21",
         "vimeo/psalm": "4.24.0"
